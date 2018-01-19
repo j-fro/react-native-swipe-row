@@ -7,20 +7,27 @@ import {
     PanResponder,
     GestureResponderEvent,
     PanResponderGestureState,
+    LayoutChangeEvent,
+    LayoutRectangle,
     Text
 } from 'react-native';
+
+const DEFAULT_THRESHOLD_PERCENT = 0.6;
+const DEFAULT_SENSITIVITY = 0.5;
 
 export interface SwipeRowProps extends ViewProperties {
     canSwipeLeft?: boolean;
     canSwipeRight?: boolean;
-    thressholdLeft?: number;
-    thressholdRight?: number;
+    thresholdLeft?: number;
+    thresholdRight?: number;
+    thresholdLeftPercent?: number;
+    thresholdRightPercent?: number;
     swipeSensivity?: number;
-    onPassThreshholdLeft?(): void;
-    onPassThreshholdRight?(): void;
+    onSwipeLeft?(): void;
+    onSwipeRight?(): void;
 }
 
-enum SwipingDirecton {
+enum Direction {
     None,
     Left,
     Right
@@ -28,8 +35,9 @@ enum SwipingDirecton {
 
 export interface SwipeRowState {
     isResetting: boolean;
-    swipingDirection: SwipingDirecton;
-    layout: Animated.ValueXY;
+    swipingDirection: Direction;
+    swiperLayout: Animated.ValueXY;
+    containerLayout: LayoutRectangle;
 }
 
 type GestureResponder<T> = (event: GestureResponderEvent, gesture: PanResponderGestureState) => T;
@@ -42,8 +50,9 @@ export default class SwipeRow extends React.Component<SwipeRowProps, SwipeRowSta
 
         this.state = {
             isResetting: false,
-            swipingDirection: SwipingDirecton.None,
-            layout: new Animated.ValueXY({ x: 0, y: 0 })
+            swipingDirection: Direction.None,
+            swiperLayout: new Animated.ValueXY({ x: 0, y: 0 }),
+            containerLayout: { x: 0, y: 0, height: 0, width: 0 }
         };
 
         this.panResponders = PanResponder.create({
@@ -57,25 +66,31 @@ export default class SwipeRow extends React.Component<SwipeRowProps, SwipeRowSta
         });
     }
 
-    private getSensivity(): number {
-        return this.props.swipeSensivity || 1;
-    }
-
     private handlePanResponderMove: GestureResponder<void> = (event, gesture) => {
-        const swipingDirection = gesture.dx > 0 ? SwipingDirecton.Right : SwipingDirecton.Left;
+        const swipingDirection = gesture.dx > 0 ? Direction.Right : Direction.Left;
         this.setState({ swipingDirection });
-        this.state.layout.setValue({ x: gesture.dx, y: 0 });
+        this.state.swiperLayout.setValue({ x: gesture.dx, y: 0 });
     };
 
     private handlePanResponderEnd: GestureResponder<void> = (event, gesture) => {
-        this.setState({ isResetting: true });
-        Animated.timing(this.state.layout.x, { toValue: 0, duration: 300 }).start(() =>
-            this.setState({ isResetting: false, swipingDirection: SwipingDirecton.None })
-        );
+        const { swipingDirection } = this.state;
+        if (
+            swipingDirection === Direction.Right &&
+            gesture.dx > this.getThresholdValue(Direction.Right)
+        ) {
+            this.swipeToEndAndReset();
+        } else if (
+            swipingDirection === Direction.Left &&
+            gesture.dx < this.getThresholdValue(Direction.Left)
+        ) {
+            this.swipeToEndAndReset();
+        } else {
+            this.resetSwiper();
+        }
     };
 
     private handleShouldSetPanResponder: GestureResponder<boolean> = (event, gesture) => {
-        if (this.state.swipingDirection !== SwipingDirecton.None) {
+        if (this.state.swipingDirection !== Direction.None) {
             return false;
         }
         if (gesture.dx < -this.getSensivity() && this.props.canSwipeLeft) {
@@ -87,11 +102,50 @@ export default class SwipeRow extends React.Component<SwipeRowProps, SwipeRowSta
         return false;
     };
 
+    private getSensivity(): number {
+        return this.props.swipeSensivity || DEFAULT_SENSITIVITY;
+    }
+
+    private getThresholdValue(direction: Direction): number {
+        if (direction === Direction.Left) {
+            if (this.props.thresholdLeft) {
+                return this.props.thresholdLeft;
+            }
+            return this.calculateThresholdFromPercent(this.props.thresholdLeftPercent);
+        } else {
+            if (this.props.thresholdRight) {
+                return this.props.thresholdRight;
+            }
+            return this.calculateThresholdFromPercent(this.props.thresholdRightPercent);
+        }
+    }
+
+    private calculateThresholdFromPercent(percent?: number): number {
+        const { width } = this.state.containerLayout;
+        return (percent || DEFAULT_THRESHOLD_PERCENT) * width;
+    }
+
+    private swipeToEndAndReset(): void {
+        const multiplier = this.state.swipingDirection === Direction.Right ? 1 : -1;
+        const toValue = this.state.containerLayout.width * multiplier;
+        Animated.spring(this.state.swiperLayout.x, { toValue }).start(() => this.resetSwiper());
+    }
+
+    private resetSwiper(): void {
+        Animated.spring(this.state.swiperLayout.x, { toValue: 0 }).start(() =>
+            this.setState({ isResetting: false, swipingDirection: Direction.None })
+        );
+    }
+
+    private handleContainerLayout = (event: LayoutChangeEvent) => {
+        this.setState({ containerLayout: { ...event.nativeEvent.layout } });
+    };
+
     public render(): JSX.Element {
         const { children, style, ...props } = this.props;
         return (
-            <View style={style}>
-                {this.state.swipingDirection === SwipingDirecton.Right && (
+            <View style={style} onLayout={this.handleContainerLayout}>
+                {this.state.swipingDirection === Direction.Right && (
                     <Animated.View
                         style={{
                             position: 'absolute',
@@ -107,7 +161,7 @@ export default class SwipeRow extends React.Component<SwipeRowProps, SwipeRowSta
                         <Text>DELETE</Text>
                     </Animated.View>
                 )}
-                {this.state.swipingDirection === SwipingDirecton.Left && (
+                {this.state.swipingDirection === Direction.Left && (
                     <Animated.View
                         style={{
                             position: 'absolute',
@@ -124,7 +178,7 @@ export default class SwipeRow extends React.Component<SwipeRowProps, SwipeRowSta
                     </Animated.View>
                 )}
                 <Animated.View
-                    style={[{ backgroundColor: 'white' }, this.state.layout.getLayout()]}
+                    style={[{ backgroundColor: 'white' }, this.state.swiperLayout.getLayout()]}
                     {...this.panResponders.panHandlers}
                     {...props}
                 >
