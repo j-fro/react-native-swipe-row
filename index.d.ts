@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleProp, ViewStyle } from 'react-native';
+import { StyleProp, ViewStyle, ViewProperties } from 'react-native';
 
 export interface SwipeRowProps extends ViewProperties {
     rowStyle?: StyleProp<ViewStyle>;
