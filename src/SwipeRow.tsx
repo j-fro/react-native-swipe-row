@@ -9,13 +9,21 @@ import {
     PanResponderGestureState,
     LayoutChangeEvent,
     LayoutRectangle,
-    Text
+    Easing,
+    StyleProp,
+    ViewStyle,
+    StyleSheet
 } from 'react-native';
 
-const DEFAULT_THRESHOLD_PERCENT = 0.6;
+const DEFAULT_THRESHOLD_PERCENT = 0.5;
 const DEFAULT_SENSITIVITY = 0.5;
 
 export interface SwipeRowProps extends ViewProperties {
+    rowStyle?: StyleProp<ViewStyle>;
+    leftUnderlayStyle?: StyleProp<ViewStyle>;
+    rightUnderlayStyle?: StyleProp<ViewStyle>;
+    leftUnderlay?: JSX.Element;
+    rightUnderlay?: JSX.Element;
     canSwipeLeft?: boolean;
     canSwipeRight?: boolean;
     thresholdLeft?: number;
@@ -34,9 +42,9 @@ enum Direction {
 }
 
 export interface SwipeRowState {
-    isResetting: boolean;
     swipingDirection: Direction;
     swiperLayout: Animated.ValueXY;
+    rawSwiperXValue: number;
     containerLayout: LayoutRectangle;
 }
 
@@ -49,11 +57,13 @@ export default class SwipeRow extends React.Component<SwipeRowProps, SwipeRowSta
         super(props);
 
         this.state = {
-            isResetting: false,
             swipingDirection: Direction.None,
             swiperLayout: new Animated.ValueXY({ x: 0, y: 0 }),
+            rawSwiperXValue: 0,
             containerLayout: { x: 0, y: 0, height: 0, width: 0 }
         };
+
+        this.state.swiperLayout.addListener(value => this.setState({ rawSwiperXValue: value.x }));
 
         this.panResponders = PanResponder.create({
             onStartShouldSetPanResponder: this.handleShouldSetPanResponder,
@@ -78,11 +88,17 @@ export default class SwipeRow extends React.Component<SwipeRowProps, SwipeRowSta
             swipingDirection === Direction.Right &&
             gesture.dx > this.getThresholdValue(Direction.Right)
         ) {
+            if (typeof this.props.onSwipeRight === 'function') {
+                this.props.onSwipeRight();
+            }
             this.swipeToEndAndReset();
         } else if (
             swipingDirection === Direction.Left &&
-            gesture.dx < this.getThresholdValue(Direction.Left)
+            gesture.dx < -this.getThresholdValue(Direction.Left)
         ) {
+            if (typeof this.props.onSwipeLeft === 'function') {
+                this.props.onSwipeLeft();
+            }
             this.swipeToEndAndReset();
         } else {
             this.resetSwiper();
@@ -128,13 +144,23 @@ export default class SwipeRow extends React.Component<SwipeRowProps, SwipeRowSta
     private swipeToEndAndReset(): void {
         const multiplier = this.state.swipingDirection === Direction.Right ? 1 : -1;
         const toValue = this.state.containerLayout.width * multiplier;
-        Animated.spring(this.state.swiperLayout.x, { toValue }).start(() => this.resetSwiper());
+        this.getSwiperAnimation(toValue).start(() => setTimeout(() => this.resetSwiper(), 500));
     }
 
     private resetSwiper(): void {
-        Animated.spring(this.state.swiperLayout.x, { toValue: 0 }).start(() =>
-            this.setState({ isResetting: false, swipingDirection: Direction.None })
-        );
+        this.getSwiperAnimation(0).start(() => this.setState({ swipingDirection: Direction.None }));
+    }
+
+    private getSwiperAnimation(toValue: number): Animated.CompositeAnimation {
+        let duration = 500;
+        const percentage =
+            Math.abs(this.state.rawSwiperXValue - toValue) / this.state.containerLayout.width;
+        duration = duration * percentage;
+        return Animated.timing(this.state.swiperLayout.x, {
+            toValue,
+            duration,
+            easing: Easing.out(Easing.cubic)
+        });
     }
 
     private handleContainerLayout = (event: LayoutChangeEvent) => {
@@ -142,43 +168,30 @@ export default class SwipeRow extends React.Component<SwipeRowProps, SwipeRowSta
     };
 
     public render(): JSX.Element {
-        const { children, style, ...props } = this.props;
+        const {
+            children,
+            style,
+            rowStyle,
+            rightUnderlayStyle,
+            rightUnderlay,
+            leftUnderlay,
+            leftUnderlayStyle,
+            ...props
+        } = this.props;
         return (
             <View style={style} onLayout={this.handleContainerLayout}>
                 {this.state.swipingDirection === Direction.Right && (
-                    <Animated.View
-                        style={{
-                            position: 'absolute',
-                            top: 0,
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            backgroundColor: 'red',
-                            alignItems: 'center'
-                            // width: this.state.layout.x
-                        }}
-                    >
-                        <Text>DELETE</Text>
-                    </Animated.View>
+                    <View style={[styles.underlay, styles.underlayRight, rightUnderlayStyle]}>
+                        {rightUnderlay}
+                    </View>
                 )}
                 {this.state.swipingDirection === Direction.Left && (
-                    <Animated.View
-                        style={{
-                            position: 'absolute',
-                            top: 0,
-                            bottom: 0,
-                            right: 0,
-                            left: 0,
-                            backgroundColor: 'blue',
-                            alignItems: 'center'
-                            // width: this.state.layout.x
-                        }}
-                    >
-                        <Text>NOT DELETE</Text>
-                    </Animated.View>
+                    <View style={[styles.underlay, styles.underlayLeft, leftUnderlayStyle]}>
+                        {leftUnderlay}
+                    </View>
                 )}
                 <Animated.View
-                    style={[{ backgroundColor: 'white' }, this.state.swiperLayout.getLayout()]}
+                    style={[styles.row, this.state.swiperLayout.getLayout(), rowStyle]}
                     {...this.panResponders.panHandlers}
                     {...props}
                 >
@@ -188,3 +201,19 @@ export default class SwipeRow extends React.Component<SwipeRowProps, SwipeRowSta
         );
     }
 }
+
+const styles = StyleSheet.create({
+    row: {
+        backgroundColor: 'white'
+    },
+    underlay: {
+        ...StyleSheet.absoluteFillObject,
+        alignItems: 'center'
+    },
+    underlayLeft: {
+        backgroundColor: 'orange'
+    },
+    underlayRight: {
+        backgroundColor: 'red'
+    }
+});
