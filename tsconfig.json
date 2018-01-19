@@ -1,10 +1,10 @@
 {
     "compilerOptions": {
         "target": "ESNEXT",
-        "module": "amd",
+        "module": "es2015",
         "jsx": "react-native",
         "sourceMap": true,
-        "outFile": "./index.js",
+        "outDir": "./build",
         "rootDir": "./src",
         "forceConsistentCasingInFileNames": true,
         "strict": true,
