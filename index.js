@@ -1,2 +1,3 @@
-import * as SwipeRow from './build/SwipeRow';
-export SwipeRow;
+import SwipeRow from './build';
+
+export default SwipeRow;
