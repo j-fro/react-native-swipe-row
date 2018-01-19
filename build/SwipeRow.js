@@ -20,16 +20,10 @@ export default class SwipeRow extends React.Component {
             const { swipingDirection } = this.state;
             if (swipingDirection === Direction.Right &&
                 gesture.dx > this.getThresholdValue(Direction.Right)) {
-                if (typeof this.props.onSwipeRight === 'function') {
-                    this.props.onSwipeRight();
-                }
                 this.swipeToEndAndReset();
             }
             else if (swipingDirection === Direction.Left &&
                 gesture.dx < -this.getThresholdValue(Direction.Left)) {
-                if (typeof this.props.onSwipeLeft === 'function') {
-                    this.props.onSwipeLeft();
-                }
                 this.swipeToEndAndReset();
             }
             else {
@@ -68,6 +62,11 @@ export default class SwipeRow extends React.Component {
             onPanResponderTerminationRequest: () => false
         });
     }
+    componentWillUnmount() {
+        if (this.resetSwiperTimer) {
+            clearInterval(this.resetSwiperTimer);
+        }
+    }
     getSensivity() {
         return this.props.swipeSensivity || DEFAULT_SENSITIVITY;
     }
@@ -92,7 +91,23 @@ export default class SwipeRow extends React.Component {
     swipeToEndAndReset() {
         const multiplier = this.state.swipingDirection === Direction.Right ? 1 : -1;
         const toValue = this.state.containerLayout.width * multiplier;
-        this.getSwiperAnimation(toValue).start(() => setTimeout(() => this.resetSwiper(), 500));
+        this.getSwiperAnimation(toValue).start(() => {
+            this.triggerThresholdAction();
+            this.resetSwiperTimer = setTimeout(() => {
+                this.resetSwiper();
+                this.resetSwiperTimer = null;
+            }, 500);
+        });
+    }
+    triggerThresholdAction() {
+        if (this.state.swipingDirection === Direction.Right &&
+            typeof this.props.onSwipeRight === 'function') {
+            this.props.onSwipeRight();
+        }
+        if (this.state.swipingDirection === Direction.Left &&
+            typeof this.props.onSwipeLeft === 'function') {
+            this.props.onSwipeLeft();
+        }
     }
     resetSwiper() {
         this.getSwiperAnimation(0).start(() => this.setState({ swipingDirection: Direction.None }));

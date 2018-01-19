@@ -52,6 +52,7 @@ type GestureResponder<T> = (event: GestureResponderEvent, gesture: PanResponderG
 
 export default class SwipeRow extends React.Component<SwipeRowProps, SwipeRowState> {
     private panResponders: PanResponderInstance;
+    private resetSwiperTimer: number | null;
 
     public constructor(props: SwipeRowProps) {
         super(props);
@@ -76,6 +77,12 @@ export default class SwipeRow extends React.Component<SwipeRowProps, SwipeRowSta
         });
     }
 
+    public componentWillUnmount(): void {
+        if (this.resetSwiperTimer) {
+            clearInterval(this.resetSwiperTimer);
+        }
+    }
+
     private handlePanResponderMove: GestureResponder<void> = (event, gesture) => {
         const swipingDirection = gesture.dx > 0 ? Direction.Right : Direction.Left;
         this.setState({ swipingDirection });
@@ -88,17 +95,11 @@ export default class SwipeRow extends React.Component<SwipeRowProps, SwipeRowSta
             swipingDirection === Direction.Right &&
             gesture.dx > this.getThresholdValue(Direction.Right)
         ) {
-            if (typeof this.props.onSwipeRight === 'function') {
-                this.props.onSwipeRight();
-            }
             this.swipeToEndAndReset();
         } else if (
             swipingDirection === Direction.Left &&
             gesture.dx < -this.getThresholdValue(Direction.Left)
         ) {
-            if (typeof this.props.onSwipeLeft === 'function') {
-                this.props.onSwipeLeft();
-            }
             this.swipeToEndAndReset();
         } else {
             this.resetSwiper();
@@ -144,7 +145,28 @@ export default class SwipeRow extends React.Component<SwipeRowProps, SwipeRowSta
     private swipeToEndAndReset(): void {
         const multiplier = this.state.swipingDirection === Direction.Right ? 1 : -1;
         const toValue = this.state.containerLayout.width * multiplier;
-        this.getSwiperAnimation(toValue).start(() => setTimeout(() => this.resetSwiper(), 500));
+        this.getSwiperAnimation(toValue).start(() => {
+            this.triggerThresholdAction();
+            this.resetSwiperTimer = setTimeout(() => {
+                this.resetSwiper();
+                this.resetSwiperTimer = null;
+            }, 500);
+        });
+    }
+
+    private triggerThresholdAction(): void {
+        if (
+            this.state.swipingDirection === Direction.Right &&
+            typeof this.props.onSwipeRight === 'function'
+        ) {
+            this.props.onSwipeRight();
+        }
+        if (
+            this.state.swipingDirection === Direction.Left &&
+            typeof this.props.onSwipeLeft === 'function'
+        ) {
+            this.props.onSwipeLeft();
+        }
     }
 
     private resetSwiper(): void {
