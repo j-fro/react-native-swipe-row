@@ -1,0 +1,23 @@
+{
+    "name": "nl-react-native-swipe-row",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "build": "tsc",
+        "watch": "tsc -w",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "react": "16.0.0",
+        "react-native": "0.51.0"
+    },
+    "devDependencies": {
+        "@types/react": "^16.0.29",
+        "tslint": "^5.8.0",
+        "typescript": "^2.6.2",
+        "@types/react-native": "^0.48.10"
+    }
+}

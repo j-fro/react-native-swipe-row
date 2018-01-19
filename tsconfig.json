@@ -1,0 +1,21 @@
+{
+    "compilerOptions": {
+        "target": "ESNEXT",
+        "module": "es2015",
+        "jsx": "react-native",
+        "sourceMap": true,
+        "outDir": "./build",
+        "rootDir": "./src",
+        "forceConsistentCasingInFileNames": true,
+        "strict": true,
+        "noEmitOnError": true,
+        "noUnusedLocals": true,
+        "noImplicitReturns": true,
+        "noFallthroughCasesInSwitch": true,
+        "moduleResolution": "node",
+        "allowSyntheticDefaultImports": true,
+        "watch": true,
+        "skipLibCheck": true,
+        "pretty": true
+    }
+}
