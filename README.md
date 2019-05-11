@@ -1,1 +1,1 @@
-# New Lion React Native SwipeRow
+# React Native SwipeRow
